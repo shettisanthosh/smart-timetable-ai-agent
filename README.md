@@ -21,3 +21,13 @@ An AI-powered academic scheduling assistant that integrates with Google Calendar
 - Git & GitHub
 
 ## 📂 Project Structure
+smart-timetable-ai-agent/
+│
+├── app.py
+├── requirements.txt
+├── services/
+│ ├── init.py
+│ └── calendar_service.py
+├── utils/
+│ ├── init.py
+│ └── helpers.py
