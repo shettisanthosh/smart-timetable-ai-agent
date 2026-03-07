@@ -1,12 +1,10 @@
 from __future__ import print_function
 import datetime
-import json
-import os
 import streamlit as st
 
-from google.oauth2.credentials import Credentials
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
+
 
 SCOPES = ["https://www.googleapis.com/auth/calendar"]
 
@@ -16,15 +14,13 @@ SCOPES = ["https://www.googleapis.com/auth/calendar"]
 # ===============================
 def authenticate_google():
     """
-    Works both locally and on Streamlit Cloud.
-    Uses credentials stored in Streamlit Secrets.
+    Authenticate using Service Account stored in Streamlit Secrets
+    Works locally and on Streamlit Cloud
     """
 
     try:
-        credentials_info = json.loads(st.secrets["GOOGLE_CREDENTIALS"])
-
         creds = service_account.Credentials.from_service_account_info(
-            credentials_info,
+            dict(st.secrets["GOOGLE_CREDENTIALS"]),
             scopes=SCOPES
         )
 
@@ -49,19 +45,24 @@ def get_calendar_events():
 
     now = datetime.datetime.utcnow().isoformat() + "Z"
 
-    events_result = (
-        service.events()
-        .list(
-            calendarId="primary",
-            timeMin=now,
-            maxResults=20,
-            singleEvents=True,
-            orderBy="startTime",
+    try:
+        events_result = (
+            service.events()
+            .list(
+                calendarId="primary",
+                timeMin=now,
+                maxResults=20,
+                singleEvents=True,
+                orderBy="startTime",
+            )
+            .execute()
         )
-        .execute()
-    )
 
-    return events_result.get("items", [])
+        return events_result.get("items", [])
+
+    except Exception as e:
+        st.error(f"Error fetching events: {e}")
+        return []
 
 
 # ===============================
@@ -74,27 +75,31 @@ def create_event(summary, start_time, end_time):
     if service is None:
         return {"status": "error"}
 
-    event_body = {
-        "summary": summary,
-        "start": {
-            "dateTime": start_time,
-            "timeZone": "Asia/Kolkata",
-        },
-        "end": {
-            "dateTime": end_time,
-            "timeZone": "Asia/Kolkata",
-        },
-    }
+    try:
+        event_body = {
+            "summary": summary,
+            "start": {
+                "dateTime": start_time,
+                "timeZone": "Asia/Kolkata",
+            },
+            "end": {
+                "dateTime": end_time,
+                "timeZone": "Asia/Kolkata",
+            },
+        }
 
-    created_event = service.events().insert(
-        calendarId="primary",
-        body=event_body
-    ).execute()
+        created_event = service.events().insert(
+            calendarId="primary",
+            body=event_body
+        ).execute()
 
-    return {
-        "status": "success",
-        "link": created_event.get("htmlLink"),
-    }
+        return {
+            "status": "success",
+            "link": created_event.get("htmlLink"),
+        }
+
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 
 # ===============================
@@ -107,51 +112,59 @@ def create_weekly_class(summary, day_of_week, start_time_str, duration_minutes, 
     if service is None:
         return None
 
-    start_time = datetime.datetime.strptime(start_time_str.strip(), "%I:%M %p").time()
+    try:
 
-    today = datetime.date.today()
+        start_time = datetime.datetime.strptime(
+            start_time_str.strip(), "%I:%M %p"
+        ).time()
 
-    days_map = {
-        "Monday": 0,
-        "Tuesday": 1,
-        "Wednesday": 2,
-        "Thursday": 3,
-        "Friday": 4,
-        "Saturday": 5,
-        "Sunday": 6,
-    }
+        today = datetime.date.today()
 
-    target_day = days_map[day_of_week]
+        days_map = {
+            "Monday": 0,
+            "Tuesday": 1,
+            "Wednesday": 2,
+            "Thursday": 3,
+            "Friday": 4,
+            "Saturday": 5,
+            "Sunday": 6,
+        }
 
-    days_ahead = target_day - today.weekday()
+        target_day = days_map[day_of_week]
 
-    if days_ahead < 0:
-        days_ahead += 7
+        days_ahead = target_day - today.weekday()
 
-    first_date = today + datetime.timedelta(days=days_ahead)
+        if days_ahead < 0:
+            days_ahead += 7
 
-    start_datetime = datetime.datetime.combine(first_date, start_time)
+        first_date = today + datetime.timedelta(days=days_ahead)
 
-    end_datetime = start_datetime + datetime.timedelta(minutes=duration_minutes)
+        start_datetime = datetime.datetime.combine(first_date, start_time)
 
-    event_body = {
-        "summary": summary,
-        "start": {
-            "dateTime": start_datetime.isoformat(),
-            "timeZone": "Asia/Kolkata",
-        },
-        "end": {
-            "dateTime": end_datetime.isoformat(),
-            "timeZone": "Asia/Kolkata",
-        },
-        "recurrence": [
-            f"RRULE:FREQ=WEEKLY;COUNT={weeks}"
-        ],
-    }
+        end_datetime = start_datetime + datetime.timedelta(minutes=duration_minutes)
 
-    created_event = service.events().insert(
-        calendarId="primary",
-        body=event_body
-    ).execute()
+        event_body = {
+            "summary": summary,
+            "start": {
+                "dateTime": start_datetime.isoformat(),
+                "timeZone": "Asia/Kolkata",
+            },
+            "end": {
+                "dateTime": end_datetime.isoformat(),
+                "timeZone": "Asia/Kolkata",
+            },
+            "recurrence": [
+                f"RRULE:FREQ=WEEKLY;COUNT={weeks}"
+            ],
+        }
 
-    return created_event.get("htmlLink")
+        created_event = service.events().insert(
+            calendarId="primary",
+            body=event_body
+        ).execute()
+
+        return created_event.get("htmlLink")
+
+    except Exception as e:
+        st.error(f"Error creating weekly class: {e}")
+        return None
