@@ -4,9 +4,9 @@ from services.calendar_service import create_event, get_calendar_events, create_
 from utils.ai_agent import parse_schedule_request
 
 
-# ==============================
-# TIME CONVERTER
-# ==============================
+# -------------------------------
+# Convert time string to 24-hour
+# -------------------------------
 def convert_to_24hr(time_str):
     try:
         return datetime.datetime.strptime(time_str.strip(), "%I:%M %p").time()
@@ -17,9 +17,9 @@ def convert_to_24hr(time_str):
             return None
 
 
-# ==============================
-# SESSION STATE INITIALIZATION
-# ==============================
+# -------------------------------
+# Session state
+# -------------------------------
 if "recommended_request" not in st.session_state:
     st.session_state.recommended_request = ""
 
@@ -33,18 +33,18 @@ if "show_class_form" not in st.session_state:
     st.session_state.show_class_form = False
 
 
-# ==============================
-# PAGE TITLE
-# ==============================
+# -------------------------------
+# Title
+# -------------------------------
 st.title("Smart Timetable AI Agent")
 
 if st.session_state.success_message:
     st.success(st.session_state.success_message)
 
 
-# ==============================
-# AI SCHEDULE ASSISTANT
-# ==============================
+# ==================================================
+# AI SCHEDULE ASSISTANT (FIXED SECTION)
+# ==================================================
 st.subheader("AI Schedule Assistant")
 st.caption("Example: Schedule project discussion tomorrow at 5 PM for 2 hours")
 
@@ -56,71 +56,75 @@ user_request = st.text_input(
 
 if st.button("Schedule with AI"):
 
-    parsed = parse_schedule_request(user_request)
-
-    if not parsed:
-        st.error("Could not understand the request.")
-
+    if not user_request.strip():
+        st.warning("Please enter a scheduling request.")
     else:
 
-        title = parsed["title"]
-        date_obj = datetime.datetime.strptime(parsed["date"], "%Y-%m-%d").date()
-        start_time = convert_to_24hr(parsed["start_time"])
-        duration = parsed["duration_minutes"]
+        with st.spinner("Processing request..."):
 
-        if not start_time:
-            st.error("Invalid time format.")
+            parsed = parse_schedule_request(user_request)
 
-        else:
-
-            start_dt = datetime.datetime.combine(date_obj, start_time)
-            end_dt = start_dt + datetime.timedelta(minutes=duration)
-
-            result = create_event(
-                title,
-                start_dt.isoformat(),
-                end_dt.isoformat()
-            )
-
-            if result["status"] == "duplicate":
-
-                st.warning("⚠ This event already exists.")
-
-            elif result["status"] == "conflict":
-
-                st.error(
-                    f"⚠ Conflict with '{result['title']}' "
-                    f"from {result['start']} to {result['end']}"
-                )
-
-                if result.get("suggested_start"):
-
-                    suggested = result["suggested_start"]
-
-                    st.info(f"Suggested Start Time: {suggested}")
-
-                    st.session_state.recommended_request = (
-                        f"Schedule {title} tomorrow at {suggested} for {duration//60} hour"
-                    )
-
+            if not parsed:
+                st.error("Could not understand the request format.")
             else:
 
-                st.session_state.success_message = (
-                    f"Successfully scheduled '{title}' "
-                    f"on {date_obj.strftime('%d %b %Y')} "
-                    f"at {parsed['start_time']}."
-                )
+                title = parsed["title"]
+                date_obj = datetime.datetime.strptime(parsed["date"], "%Y-%m-%d").date()
+                start_time = convert_to_24hr(parsed["start_time"])
+                duration = parsed["duration_minutes"]
 
-                st.session_state.recommended_request = ""
-                st.rerun()
+                if not start_time:
+                    st.error("Invalid time format detected.")
+                else:
+
+                    start_dt = datetime.datetime.combine(date_obj, start_time)
+                    end_dt = start_dt + datetime.timedelta(minutes=duration)
+
+                    result = create_event(
+                        title,
+                        start_dt.isoformat(),
+                        end_dt.isoformat()
+                    )
+
+                    if result["status"] == "duplicate":
+
+                        st.warning("⚠ This event already exists.")
+
+                    elif result["status"] == "conflict":
+
+                        st.error(
+                            f"⚠ Conflict with '{result['title']}' "
+                            f"from {result['start']} to {result['end']}"
+                        )
+
+                        if result.get("suggested_start"):
+
+                            suggested = result["suggested_start"]
+
+                            st.info(f"Suggested Start Time: {suggested}")
+
+                            st.session_state.recommended_request = (
+                                f"Schedule {title} tomorrow at {suggested} for {duration//60} hour"
+                            )
+
+                    else:
+
+                        st.session_state.success_message = (
+                            f"Successfully scheduled '{title}' "
+                            f"on {date_obj.strftime('%d %b %Y')} "
+                            f"at {parsed['start_time']}."
+                        )
+
+                        st.session_state.recommended_request = ""
+                        st.rerun()
 
 
 st.divider()
 
 
-# ==============================
-# MANUAL SCHEDULE CREATION
-# ==============================
+# ==================================================
+# MANUAL EVENT CREATION
+# ==================================================
 st.subheader("Create Schedule Manually")
 
 if st.button("Create Manually"):
@@ -178,9 +182,9 @@ if st.session_state.show_manual:
 st.divider()
 
 
-# ==============================
+# ==================================================
 # CLASS SCHEDULE TEMPLATE
-# ==============================
+# ==================================================
 st.subheader("📚 Class Schedule Template")
 
 if st.button("Add Weekly Class"):
@@ -239,12 +243,15 @@ if st.session_state.show_class_form:
 st.divider()
 
 
-# ==============================
+# ==================================================
 # UPCOMING EVENTS
-# ==============================
+# ==================================================
 st.subheader("Upcoming Events")
 
-events = get_calendar_events()
+try:
+    events = get_calendar_events()
+except:
+    events = []
 
 if not events:
     st.write("No upcoming events found.")
