@@ -4,9 +4,9 @@ from services.calendar_service import create_event, get_calendar_events, create_
 from utils.ai_agent import parse_schedule_request
 
 
-# =========================
+# ==============================
 # TIME CONVERTER
-# =========================
+# ==============================
 def convert_to_24hr(time_str):
     try:
         return datetime.datetime.strptime(time_str.strip(), "%I:%M %p").time()
@@ -17,9 +17,9 @@ def convert_to_24hr(time_str):
             return None
 
 
-# =========================
-# SESSION STATE
-# =========================
+# ==============================
+# SESSION STATE INITIALIZATION
+# ==============================
 if "recommended_request" not in st.session_state:
     st.session_state.recommended_request = ""
 
@@ -33,20 +33,19 @@ if "show_class_form" not in st.session_state:
     st.session_state.show_class_form = False
 
 
-# =========================
-# TITLE
-# =========================
+# ==============================
+# PAGE TITLE
+# ==============================
 st.title("Smart Timetable AI Agent")
 
 if st.session_state.success_message:
     st.success(st.session_state.success_message)
 
 
-# =========================
-# AI SCHEDULER
-# =========================
+# ==============================
+# AI SCHEDULE ASSISTANT
+# ==============================
 st.subheader("AI Schedule Assistant")
-
 st.caption("Example: Schedule project discussion tomorrow at 5 PM for 2 hours")
 
 user_request = st.text_input(
@@ -55,29 +54,26 @@ user_request = st.text_input(
     label_visibility="collapsed"
 )
 
-
 if st.button("Schedule with AI"):
 
     parsed = parse_schedule_request(user_request)
 
     if not parsed:
         st.error("Could not understand the request.")
+
     else:
 
         title = parsed["title"]
-
         date_obj = datetime.datetime.strptime(parsed["date"], "%Y-%m-%d").date()
-
         start_time = convert_to_24hr(parsed["start_time"])
-
         duration = parsed["duration_minutes"]
 
         if not start_time:
             st.error("Invalid time format.")
+
         else:
 
             start_dt = datetime.datetime.combine(date_obj, start_time)
-
             end_dt = start_dt + datetime.timedelta(minutes=duration)
 
             result = create_event(
@@ -116,37 +112,30 @@ if st.button("Schedule with AI"):
                 )
 
                 st.session_state.recommended_request = ""
-
                 st.rerun()
 
 
 st.divider()
 
 
-# =========================
-# MANUAL SCHEDULER
-# =========================
+# ==============================
+# MANUAL SCHEDULE CREATION
+# ==============================
 st.subheader("Create Schedule Manually")
 
 if st.button("Create Manually"):
     st.session_state.show_manual = True
 
-
 if st.session_state.show_manual:
 
     event_title = st.text_input("Event Title")
-
     date = st.date_input("Event Date")
-
     start_input = st.text_input("Start Time (Example: 5:00 PM)")
-
     end_input = st.text_input("End Time (Example: 6:00 PM)")
-
 
     if st.button("Create Event"):
 
         start_time = convert_to_24hr(start_input)
-
         end_time = convert_to_24hr(end_input)
 
         if not event_title:
@@ -161,7 +150,6 @@ if st.session_state.show_manual:
         else:
 
             start_dt = datetime.datetime.combine(date, start_time)
-
             end_dt = datetime.datetime.combine(date, end_time)
 
             result = create_event(
@@ -190,14 +178,13 @@ if st.session_state.show_manual:
 st.divider()
 
 
-# =========================
+# ==============================
 # CLASS SCHEDULE TEMPLATE
-# =========================
+# ==============================
 st.subheader("📚 Class Schedule Template")
 
 if st.button("Add Weekly Class"):
     st.session_state.show_class_form = True
-
 
 if st.session_state.show_class_form:
 
@@ -205,15 +192,7 @@ if st.session_state.show_class_form:
 
     day = st.selectbox(
         "Day of Week",
-        [
-            "Monday",
-            "Tuesday",
-            "Wednesday",
-            "Thursday",
-            "Friday",
-            "Saturday",
-            "Sunday",
-        ],
+        ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
     )
 
     class_time = st.text_input("Start Time (Example: 9:00 AM)")
@@ -233,11 +212,11 @@ if st.session_state.show_class_form:
         value=8
     )
 
-
     if st.button("Create Weekly Class"):
 
         if not class_name:
             st.error("Enter class name.")
+
         else:
 
             try:
@@ -251,7 +230,6 @@ if st.session_state.show_class_form:
                 )
 
                 st.success("Weekly class created successfully!")
-
                 st.write(f"View in Calendar: {link}")
 
             except:
@@ -261,9 +239,9 @@ if st.session_state.show_class_form:
 st.divider()
 
 
-# =========================
+# ==============================
 # UPCOMING EVENTS
-# =========================
+# ==============================
 st.subheader("Upcoming Events")
 
 events = get_calendar_events()
@@ -276,13 +254,9 @@ for event in events:
     start = event["start"].get("dateTime", event["start"].get("date"))
 
     if "T" in start:
-
         dt = datetime.datetime.fromisoformat(start.split("+")[0])
-
         formatted = dt.strftime("%d %b %Y | %I:%M %p")
-
     else:
-
         formatted = start
 
     st.write(f"{event.get('summary','No Title')} - {formatted}")
