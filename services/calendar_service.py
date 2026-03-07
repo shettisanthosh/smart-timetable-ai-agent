@@ -1,31 +1,51 @@
 from __future__ import print_function
 import datetime
-import os.path
+import os
+import json
+import streamlit as st
 
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 
+
 SCOPES = ["https://www.googleapis.com/auth/calendar"]
 
 
 # ===============================
-# AUTHENTICATION
+# GOOGLE AUTHENTICATION
 # ===============================
 def authenticate_google():
+
     creds = None
 
     if os.path.exists("token.json"):
         creds = Credentials.from_authorized_user_file("token.json", SCOPES)
 
     if not creds or not creds.valid:
+
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
+
         else:
-            flow = InstalledAppFlow.from_client_secrets_file(
-                "credentials.json", SCOPES
-            )
+
+            # STREAMLIT CLOUD
+            if "GOOGLE_CREDENTIALS" in st.secrets:
+                credentials_info = json.loads(st.secrets["GOOGLE_CREDENTIALS"])
+
+                flow = InstalledAppFlow.from_client_config(
+                    credentials_info,
+                    SCOPES
+                )
+
+            # LOCAL MACHINE
+            else:
+                flow = InstalledAppFlow.from_client_secrets_file(
+                    "credentials.json",
+                    SCOPES
+                )
+
             creds = flow.run_local_server(port=0)
 
         with open("token.json", "w") as token:
@@ -38,7 +58,9 @@ def authenticate_google():
 # GET UPCOMING EVENTS
 # ===============================
 def get_calendar_events():
+
     service = authenticate_google()
+
     now = datetime.datetime.utcnow().isoformat() + "Z"
 
     events_result = (
@@ -57,7 +79,7 @@ def get_calendar_events():
 
 
 # ===============================
-# CREATE EVENT (Duplicate + Conflict + Suggestion)
+# CREATE EVENT
 # ===============================
 def create_event(summary, start_time, end_time):
 
@@ -83,19 +105,24 @@ def create_event(summary, start_time, end_time):
     )
 
     events = events_result.get("items", [])
+
     busy_slots = []
 
     for event in events:
+
         if "dateTime" in event["start"]:
+
             existing_start = datetime.datetime.fromisoformat(
                 event["start"]["dateTime"].split("+")[0]
             )
+
             existing_end = datetime.datetime.fromisoformat(
                 event["end"]["dateTime"].split("+")[0]
             )
+
             existing_title = event.get("summary", "")
 
-            # Prevent exact duplicate
+            # PREVENT DUPLICATE EVENT
             if (
                 existing_start == new_start
                 and existing_end == new_end
@@ -108,11 +135,13 @@ def create_event(summary, start_time, end_time):
     busy_slots.sort(key=lambda x: x[0])
 
     for start_dt, end_dt, title in busy_slots:
+
         if new_start < end_dt and new_end > start_dt:
 
             suggested_start = end_dt
 
             if suggested_start + duration > day_end:
+
                 return {
                     "status": "conflict",
                     "title": "No available slot today",
@@ -129,21 +158,32 @@ def create_event(summary, start_time, end_time):
                 "suggested_start": suggested_start.strftime("%I:%M %p"),
             }
 
+    # CREATE EVENT
     event_body = {
         "summary": summary,
-        "start": {"dateTime": start_time, "timeZone": "Asia/Kolkata"},
-        "end": {"dateTime": end_time, "timeZone": "Asia/Kolkata"},
+        "start": {
+            "dateTime": start_time,
+            "timeZone": "Asia/Kolkata",
+        },
+        "end": {
+            "dateTime": end_time,
+            "timeZone": "Asia/Kolkata",
+        },
     }
 
     created_event = service.events().insert(
-        calendarId="primary", body=event_body
+        calendarId="primary",
+        body=event_body
     ).execute()
 
-    return {"status": "success", "link": created_event.get("htmlLink")}
+    return {
+        "status": "success",
+        "link": created_event.get("htmlLink")
+    }
 
 
 # ===============================
-# CREATE WEEKLY CLASS (Recurring)
+# CREATE WEEKLY CLASS
 # ===============================
 def create_weekly_class(summary, day_of_week, start_time_str, duration_minutes, weeks):
 
@@ -164,24 +204,34 @@ def create_weekly_class(summary, day_of_week, start_time_str, duration_minutes, 
     }
 
     target_day = days_map[day_of_week]
+
     days_ahead = target_day - today.weekday()
+
     if days_ahead < 0:
         days_ahead += 7
 
     first_date = today + datetime.timedelta(days=days_ahead)
 
     start_datetime = datetime.datetime.combine(first_date, start_time)
+
     end_datetime = start_datetime + datetime.timedelta(minutes=duration_minutes)
 
     event_body = {
         "summary": summary,
-        "start": {"dateTime": start_datetime.isoformat(), "timeZone": "Asia/Kolkata"},
-        "end": {"dateTime": end_datetime.isoformat(), "timeZone": "Asia/Kolkata"},
+        "start": {
+            "dateTime": start_datetime.isoformat(),
+            "timeZone": "Asia/Kolkata",
+        },
+        "end": {
+            "dateTime": end_datetime.isoformat(),
+            "timeZone": "Asia/Kolkata",
+        },
         "recurrence": [f"RRULE:FREQ=WEEKLY;COUNT={weeks}"],
     }
 
     created_event = service.events().insert(
-        calendarId="primary", body=event_body
+        calendarId="primary",
+        body=event_body
     ).execute()
 
     return created_event.get("htmlLink")
