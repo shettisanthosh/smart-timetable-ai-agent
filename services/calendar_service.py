@@ -13,16 +13,18 @@ from googleapiclient.discovery import build
 SCOPES = ["https://www.googleapis.com/auth/calendar"]
 
 
-# ===============================
+# =================================================
 # GOOGLE AUTHENTICATION
-# ===============================
+# =================================================
 def authenticate_google():
 
     creds = None
 
+    # Load saved token
     if os.path.exists("token.json"):
         creds = Credentials.from_authorized_user_file("token.json", SCOPES)
 
+    # If no valid credentials
     if not creds or not creds.valid:
 
         if creds and creds.expired and creds.refresh_token:
@@ -30,8 +32,9 @@ def authenticate_google():
 
         else:
 
-            # STREAMLIT CLOUD
+            # -------- STREAMLIT CLOUD --------
             if "GOOGLE_CREDENTIALS" in st.secrets:
+
                 credentials_info = json.loads(st.secrets["GOOGLE_CREDENTIALS"])
 
                 flow = InstalledAppFlow.from_client_config(
@@ -39,25 +42,34 @@ def authenticate_google():
                     SCOPES
                 )
 
-            # LOCAL MACHINE
+                # IMPORTANT: Use local server OFF
+                creds = flow.run_local_server(
+                    port=0,
+                    open_browser=False
+                )
+
+            # -------- LOCAL MACHINE --------
             else:
+
                 flow = InstalledAppFlow.from_client_secrets_file(
                     "credentials.json",
                     SCOPES
                 )
 
-            creds = flow.run_console()
+                creds = flow.run_local_server(port=0)
 
+        # Save token
         with open("token.json", "w") as token:
             token.write(creds.to_json())
+
     service = build("calendar", "v3", credentials=creds)
 
     return service
 
 
-# ===============================
+# =================================================
 # GET UPCOMING EVENTS
-# ===============================
+# =================================================
 def get_calendar_events():
 
     service = authenticate_google()
@@ -79,15 +91,16 @@ def get_calendar_events():
     return events_result.get("items", [])
 
 
-# ===============================
-# CREATE EVENT
-# ===============================
+# =================================================
+# CREATE EVENT (Duplicate + Conflict + Suggestion)
+# =================================================
 def create_event(summary, start_time, end_time):
 
     service = authenticate_google()
 
     new_start = datetime.datetime.fromisoformat(start_time)
     new_end = datetime.datetime.fromisoformat(end_time)
+
     duration = new_end - new_start
 
     day_start = new_start.replace(hour=8, minute=0, second=0, microsecond=0)
@@ -123,7 +136,7 @@ def create_event(summary, start_time, end_time):
 
             existing_title = event.get("summary", "")
 
-            # PREVENT DUPLICATE EVENT
+            # Prevent exact duplicate
             if (
                 existing_start == new_start
                 and existing_end == new_end
@@ -159,7 +172,7 @@ def create_event(summary, start_time, end_time):
                 "suggested_start": suggested_start.strftime("%I:%M %p"),
             }
 
-    # CREATE EVENT
+    # Create event
     event_body = {
         "summary": summary,
         "start": {
@@ -183,9 +196,9 @@ def create_event(summary, start_time, end_time):
     }
 
 
-# ===============================
-# CREATE WEEKLY CLASS
-# ===============================
+# =================================================
+# CREATE WEEKLY CLASS (Recurring)
+# =================================================
 def create_weekly_class(summary, day_of_week, start_time_str, duration_minutes, weeks):
 
     service = authenticate_google()
