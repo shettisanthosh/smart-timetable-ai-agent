@@ -4,9 +4,9 @@ from services.calendar_service import create_event, get_calendar_events, create_
 from utils.ai_agent import parse_schedule_request
 
 
-# ====================================
+# =========================
 # TIME CONVERTER
-# ====================================
+# =========================
 def convert_to_24hr(time_str):
     try:
         return datetime.datetime.strptime(time_str.strip(), "%I:%M %p").time()
@@ -17,9 +17,9 @@ def convert_to_24hr(time_str):
             return None
 
 
-# ====================================
+# =========================
 # SESSION STATE
-# ====================================
+# =========================
 if "recommended_request" not in st.session_state:
     st.session_state.recommended_request = ""
 
@@ -33,18 +33,18 @@ if "show_class_form" not in st.session_state:
     st.session_state.show_class_form = False
 
 
-# ====================================
-# PAGE TITLE
-# ====================================
+# =========================
+# TITLE
+# =========================
 st.title("Smart Timetable AI Agent")
 
 if st.session_state.success_message:
     st.success(st.session_state.success_message)
 
 
-# ====================================
-# AI SCHEDULE ASSISTANT
-# ====================================
+# =========================
+# AI SCHEDULER
+# =========================
 st.subheader("AI Schedule Assistant")
 
 st.caption("Example: Schedule project discussion tomorrow at 5 PM for 2 hours")
@@ -62,34 +62,34 @@ if st.button("Schedule with AI"):
 
     if not parsed:
         st.error("Could not understand the request.")
-
     else:
 
         title = parsed["title"]
+
         date_obj = datetime.datetime.strptime(parsed["date"], "%Y-%m-%d").date()
 
         start_time = convert_to_24hr(parsed["start_time"])
+
         duration = parsed["duration_minutes"]
 
         if not start_time:
             st.error("Invalid time format.")
-
         else:
 
             start_dt = datetime.datetime.combine(date_obj, start_time)
+
             end_dt = start_dt + datetime.timedelta(minutes=duration)
 
             result = create_event(
                 title,
                 start_dt.isoformat(),
-                end_dt.isoformat(),
+                end_dt.isoformat()
             )
 
-            # DUPLICATE EVENT
             if result["status"] == "duplicate":
+
                 st.warning("⚠ This event already exists.")
 
-            # CONFLICT
             elif result["status"] == "conflict":
 
                 st.error(
@@ -107,7 +107,6 @@ if st.button("Schedule with AI"):
                         f"Schedule {title} tomorrow at {suggested} for {duration//60} hour"
                     )
 
-            # SUCCESS
             else:
 
                 st.session_state.success_message = (
@@ -124,9 +123,9 @@ if st.button("Schedule with AI"):
 st.divider()
 
 
-# ====================================
-# MANUAL EVENT CREATION
-# ====================================
+# =========================
+# MANUAL SCHEDULER
+# =========================
 st.subheader("Create Schedule Manually")
 
 if st.button("Create Manually"):
@@ -139,12 +138,15 @@ if st.session_state.show_manual:
 
     date = st.date_input("Event Date")
 
-    start_input = st.text_input("Start Time (example: 5:00 PM)")
-    end_input = st.text_input("End Time (example: 6:00 PM)")
+    start_input = st.text_input("Start Time (Example: 5:00 PM)")
+
+    end_input = st.text_input("End Time (Example: 6:00 PM)")
+
 
     if st.button("Create Event"):
 
         start_time = convert_to_24hr(start_input)
+
         end_time = convert_to_24hr(end_input)
 
         if not event_title:
@@ -159,18 +161,21 @@ if st.session_state.show_manual:
         else:
 
             start_dt = datetime.datetime.combine(date, start_time)
+
             end_dt = datetime.datetime.combine(date, end_time)
 
             result = create_event(
                 event_title,
                 start_dt.isoformat(),
-                end_dt.isoformat(),
+                end_dt.isoformat()
             )
 
             if result["status"] == "duplicate":
+
                 st.warning("⚠ This event already exists.")
 
             elif result["status"] == "conflict":
+
                 st.error("⚠ Conflict detected with another event.")
 
             else:
@@ -185,9 +190,9 @@ if st.session_state.show_manual:
 st.divider()
 
 
-# ====================================
+# =========================
 # CLASS SCHEDULE TEMPLATE
-# ====================================
+# =========================
 st.subheader("📚 Class Schedule Template")
 
 if st.button("Add Weekly Class"):
@@ -211,28 +216,28 @@ if st.session_state.show_class_form:
         ],
     )
 
-    class_time = st.text_input("Start Time (example: 9:00 AM)")
+    class_time = st.text_input("Start Time (Example: 9:00 AM)")
 
     duration = st.number_input(
         "Duration (minutes)",
         min_value=30,
         max_value=300,
         value=60,
-        step=30,
+        step=30
     )
 
     weeks = st.number_input(
         "Number of Weeks",
         min_value=1,
         max_value=16,
-        value=8,
+        value=8
     )
+
 
     if st.button("Create Weekly Class"):
 
         if not class_name:
             st.error("Enter class name.")
-
         else:
 
             try:
@@ -242,7 +247,7 @@ if st.session_state.show_class_form:
                     day,
                     class_time,
                     duration,
-                    weeks,
+                    weeks
                 )
 
                 st.success("Weekly class created successfully!")
@@ -256,9 +261,9 @@ if st.session_state.show_class_form:
 st.divider()
 
 
-# ====================================
+# =========================
 # UPCOMING EVENTS
-# ====================================
+# =========================
 st.subheader("Upcoming Events")
 
 events = get_calendar_events()
